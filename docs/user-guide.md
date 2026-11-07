@@ -23,6 +23,7 @@ This guide covers the QExcel pane in Excel. Installing QExcel is described in
 - [Formulas](#formulas)
 - [Queries from someone else's workbook](#queries-from-someone-elses-workbook)
 - [When something goes wrong](#when-something-goes-wrong)
+- [The query header](#the-query-header)
 
 ## Quick start
 
@@ -255,7 +256,7 @@ After saving, choose how the workbook uses the query:
 
 | Choice | Best for | What it does |
 |---|---|---|
-| **Add to worksheet** | Registers and extracts, up to a million rows | Fetches every row into an Excel table at the selected cell. Refreshing keeps the table's style, your formatting, and your own columns to the right of the result |
+| **Add to worksheet** | Registers and extracts, up to a million rows (more: see [More rows than a worksheet holds](#more-rows-than-a-worksheet-holds)) | Fetches every row into an Excel table at the selected cell. Refreshing keeps the table's style, your formatting, and your own columns to the right of the result |
 | **Insert a formula** | One number in a report (`OF.CALL`), or a small result as a spilled array (`OF.TABLE`, up to 10,000 rows) | Writes `=OF.CALL(…)` in the selected cell when Preview showed a single value, `=OF.TABLE(…)` otherwise |
 | **Use as a source** | A step that only feeds calculations | Writes nothing; calculations read it |
 
@@ -263,7 +264,8 @@ After saving, choose how the workbook uses the query:
 
 What the header of a query file holds besides these fields (`@column`, `@refresh`,
 `@max_rows`, comments) is kept as written and named above the SQL. **Show the header in the
-SQL** shows the whole text, header included, to change it by hand.
+SQL** shows the whole text, header included, to change it by hand: see
+[The query header](#the-query-header).
 
 ## Calculations: combining data on your computer
 
@@ -293,6 +295,23 @@ The **Sources** list above the SQL holds them:
 
 Refreshing a calculation fetches its Fusion sources and reads its Excel sources first; **Sources
 and refresh details** on its card shows the whole chain.
+
+### More rows than a worksheet holds
+
+A worksheet holds 1,048,575 rows under its header, and a worksheet table refuses a larger
+result. A query that only feeds a calculation may fetch more:
+
+1. Save the Fusion query and choose **Use as a source**.
+2. Raise its row limit: **Show the header in the SQL** and add a line `-- @max_rows: 5000000`.
+   Without it a query keeps at most 1,000,000 rows; with it, up to 100,000,000.
+3. A calculation reads it and totals or filters it — `GROUP BY`, `WHERE` — and its result goes
+   on the sheet.
+
+A source cut at its limit is refused by the calculation ("Dependency … has only its first N
+rows") rather than totalled in part: raise the limit or narrow the query. Fetching takes time —
+about 5,000 rows a second from Fusion, so five million rows take a quarter of an hour, and a run
+stops after 30 minutes. When you do not need the detail on your computer, a total in the Oracle
+SQL itself (`GROUP BY` in Fusion) is faster still.
 
 ## Excel sources: tables of the workbook in SQL
 
@@ -387,3 +406,54 @@ trust it again.
 - For a support request, **Advanced & diagnostics > Copy diagnostics**: versions, files,
   connections and recent errors. It names your connections and their Fusion addresses: read it
   before you send it.
+
+## The query header
+
+A query is SQL with a header of comment lines on top, one setting each: `-- @key: value`. The
+editor writes the header from its fields; you write it yourself only in **Show the header in
+the SQL**, or in a query file of your library.
+
+```sql
+-- @id: ap_open_invoices
+-- @engine: oracle
+-- @version: 1
+-- @title: AP open invoices
+-- @description: Invoice installments that still have an amount to pay.
+-- @param business_unit: string = "" | Business unit name; empty for all you may see
+-- @column INVOICE_NUM: string | Invoice
+-- @column AMOUNT_REMAINING: number | Remaining
+-- @max_rows: 500000
+SELECT …
+```
+
+| Setting | Required | What it does | In the editor |
+|---|---|---|---|
+| `@id` | yes | The query's name, used by formulas and calculations: lower-case letters, digits and `_` | Name |
+| `@engine` | yes | `oracle` runs in Fusion, `local` is a calculation on your computer | Oracle \| Local |
+| `@version` | yes | A whole number; raise it when the query changes its meaning | Version |
+| `@title` | no | A readable title, up to 200 characters | Title |
+| `@description` | no | What the query is for; several lines join into one text | Description |
+| `@connection` | no | Oracle only: the connection it runs on by default | the connection |
+| `@param` | no, repeated | A parameter: `name: type [= default] [\| description]`, in the order formulas pass them | Parameters |
+| `@column` | no, repeated | A result column's type and header: `NAME: type [\| header]`. Without it the type is guessed from the values | — |
+| `@depends` | no, repeated | Local only: a source and the parameters passed to it, `gl_balance(period := $period)`, or `xl_import.budget` for an Excel source | Sources |
+| `@refresh` | no | `full`, the only kind for now: every refresh fetches the whole result | — |
+| `@max_rows` | no | The most rows the query keeps, up to 100,000,000; 1,000,000 without it. See [More rows than a worksheet holds](#more-rows-than-a-worksheet-holds) | — |
+
+Other comment lines in the header are kept as they are. A setting that is misspelt or repeated
+is an error, shown with its line.
+
+**Parameter types:** `string`, `id` (a code kept as text, so `00123` stays `00123`),
+`integer`, `number`, `decimal(p,s)`, `date`, `timestamp`, `boolean`, `enum(OPEN,PAID,ALL)`
+(one of the listed values), and `list<T>` — several values of a type, `list<id> = 1, 2, 3`. A
+text default with `|` in it goes in double quotes, `= "a | b"`; an empty one is `= ""`.
+
+**Column types:** `id`, `string` and `text` (kept as text in Excel; `text` for long values),
+`integer`, `number`, `decimal(p,s)`, `date`, `timestamp`, `timestamptz` (in UTC; the header
+gets " (UTC)"), `boolean`. A value that does not fit its declared type fails the refresh and
+says which column, row and value.
+
+**Your library is files.** Each query of your library is a file `<id>.sql` in the `queries`
+folder of a project in `~/QExcel/projects` (on Windows `%USERPROFILE%\QExcel\projects`), for
+example `~/QExcel/projects/finance/queries/ap_open_invoices.sql`. A file you change by hand is
+read when the QExcel service starts: **Restart** in the QExcel icon's menu.
