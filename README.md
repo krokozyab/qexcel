@@ -90,10 +90,3 @@ Publisher report deployed in your instance.
 
 The [user guide](docs/user-guide.md) covers the QExcel pane: connections, parameters, the query
 editor, calculations, Excel sources, formulas and what to do when something goes wrong.
-
-## Author
-
-QExcel is made by Sergey Rudenko.
-
-QExcel is not affiliated with or endorsed by Oracle. Oracle, Oracle Fusion, BI Publisher, OTBI
-and Smart View are trademarks of Oracle and/or its affiliates.

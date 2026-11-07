@@ -93,7 +93,7 @@ A card shows:
 - the query's title, and the table — `Sheet1!tblBalances ↗` takes you to it;
 - where the data comes from: the Fusion environment ("PROD"), or "Calculated · TEST" for a
   calculation, "TEST + PROD" when its sources come from both;
-- the parameters, next to how fresh it is: "ledger ← A1 · period = Oct-26";
+- the parameters, next to how fresh it is: "ledger ← A1 · currency = USD";
 - what happened, as it happened: "Updated today 09:45 · 1,234 rows", "Last refresh failed: …".
   QExcel says when it last wrote, not whether Fusion has changed since;
 - the refresh button, and **⋯**:
@@ -225,7 +225,7 @@ The **Sources** list above the SQL holds them:
   the cursor. The first source of a new calculation replaces its placeholder with
   `SELECT * FROM gl_trial_balance`.
 - **Parameters a source takes** are passed from the calculation: `period ← $period` by
-  default. You can pass a fixed value instead — `'US Primary'`, a number, `DATE '2026-10-31'`,
+  default. You can pass a fixed value instead — `'US Primary'`, a number, a date,
   `TRUE` — or another parameter, `$prior_period`. A parameter a source needs is added to the
   calculation.
 - **⋯ > Columns** shows a source's columns; **Remove source** is refused while the SQL still
@@ -318,8 +318,9 @@ trust it again.
 - **A table says "Last refresh failed"** — the reason is on the card; Needs attention has the
   same, with **Show**. Fix it and refresh again.
 - **"Written part way"** — the fetched data is saved; **Retry write** writes it without Fusion.
-- **A text parameter got a number** — Excel turned a cell like `Sep-26` into a date. The card
-  says "period expects text, but Sheet1!B1 holds a number": format the cell as text.
+- **A text parameter got a number** — Excel turned a period name typed into a cell, like
+  `Mon-YY`, into a date. The card says "period expects text, but Sheet1!B1 holds a number":
+  format the cell as text.
 - For a support request, **Advanced & diagnostics > Copy diagnostics**: versions, files,
   connections and recent errors. It names your connections and their Fusion addresses: read it
   before you send it.
