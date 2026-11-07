@@ -26,24 +26,14 @@ This guide covers the QExcel pane in Excel. Installing QExcel is described in
 
 ## Quick start
 
-### A colleague sent you a QExcel workbook
-
-1. Open the workbook, then the pane: **Home > Add-ins > QExcel**.
-2. If you have no connection yet, the line at the top of the Workbook tab asks for one: add it
-   (see [Connections](#connections)) and **Sign in** with your own Fusion account.
-3. **Needs attention** lists the workbook's queries to confirm. **Review** shows each query's
-   text; **Trust** lets it run.
-4. Change the report's parameters on the sheet — a period, a business unit — and click
-   **Refresh workbook**.
-
-### You are building a report
-
-1. On the **Build** tab, **+ Add > From Fusion** — or **Use a saved query** to start from one of
+1. Open the pane with **Home > Add-ins > QExcel**, add a connection to Fusion and **Sign in**
+   (see [Connections](#connections)).
+2. On the **Build** tab, **+ Add > From Fusion** — or **Use a saved query** to start from one of
    the examples (GL trial balance, AP open invoices, AR aging).
-2. Write the Oracle SQL with parameters such as `:period`: `WHERE period_name = :period`.
-3. Under **Parameters**, set `period` to **Cell** and click **Selected cell** with, say, `B1`
+3. Write the Oracle SQL with parameters such as `:period`: `WHERE period_name = :period`.
+4. Under **Parameters**, set `period` to **Cell** and click **Selected cell** with, say, `B1`
    selected. **Preview** shows the first 200 rows; then **Save**.
-4. Select an empty cell and **Add to worksheet**. The new table takes `period` from `B1`: change
+5. Select an empty cell and **Add to worksheet**. The new table takes `period` from `B1`: change
    `B1`, click **Refresh**, and the table follows.
 
 ## How QExcel works
@@ -61,11 +51,15 @@ recalculating the workbook does not go to Fusion. Fusion is asked only when you 
 
 A workbook is made of **steps**, of three kinds:
 
-| Step | What it is | Where it runs |
-|---|---|---|
-| **From Fusion** | An Oracle SQL query | In Fusion, when you refresh; the result is kept on your computer |
-| **From this workbook** (an *Excel source*) | A table or range of the workbook, read as data | On your computer |
-| **Calculated from saved data** | DuckDB SQL joining or totalling the other steps | On your computer, without Fusion |
+| Step | What it is | SQL dialect | Where it runs |
+|---|---|---|---|
+| **From Fusion** | A query on Fusion tables and views | **Oracle SQL**, parameters as `:period` | In Fusion, when you refresh; the result is kept on your computer |
+| **From this workbook** (an *Excel source*) | A table or range of the workbook, read as data | None: no SQL to write | On your computer |
+| **Calculated from saved data** | A query on the other steps, by their names | **DuckDB SQL**, parameters as `$period` | On your computer, without Fusion |
+
+In the editor, **Oracle** or **Local** at the top picks the dialect: Oracle for a query on Fusion,
+Local for a calculation. Oracle SQL sees only Fusion; DuckDB SQL sees only the steps — the
+results already fetched and the Excel sources — never Fusion tables directly.
 
 > **For example — reconciling payments with the bank:**
 >
