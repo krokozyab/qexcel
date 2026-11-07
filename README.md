@@ -1,66 +1,98 @@
 # QExcel
 
-**Live Oracle Fusion SQL inside Excel — parameters in worksheet cells, one-click refresh,
-formulas that work from local data.**
+**Oracle SQL and a local DuckDB SQL engine, inside Excel.**
 
-Stop exporting `.xlsx` files from BI Publisher or OTBI and pasting them into your workbooks.
-Smart View brings cubes and balances into Excel; QExcel brings the transactions behind them. It
-runs your own Oracle SQL against Fusion tables and views — AP, AR, PO, FA, SLA, HR — keeps the
-result on your computer in an embedded [DuckDB](https://duckdb.org) database, and writes it
-into Excel tables and formulas that refresh in place.
+Fetch data from Oracle Fusion once, join it with the tables of your workbook in SQL, take
+parameters from cells, and refresh your tables and formulas with one click.
 
-QExcel runs on **macOS and Windows**.
+QExcel is not another table downloader. Exports from BI Publisher or OTBI give you a dead file
+each time; Smart View brings cubes and balances, not the transactions behind them. QExcel pairs
+Excel with [DuckDB](https://duckdb.org), an analytical database that runs on your computer:
+
+1. **Oracle SQL** fetches data from Fusion — any table or view your role can read — and keeps it
+   on your computer.
+2. **DuckDB SQL** totals, filters and joins what was fetched, together with tables of your
+   workbook, on your computer, without going back to Fusion.
+
+Runs on **macOS and Windows**.
 
 ## Why use it
 
-- **Report parameters live on your sheet.** Point a query parameter (`:period`, `:ledger`,
-  `:bu`) to a cell. Type the next period in that cell, click **Refresh**, and the Excel table
-  updates in place — the formulas around it keep working.
-- **Fusion only when you ask.** Formulas (`OF.TABLE`, `OF.CALL`) read data already fetched; they
-  never call Fusion by themselves. Fusion is asked when you click **Refresh** or **Fetch** — so
-  recalculating the workbook does not wait on the network.
-- **Combine Fusion data with your own tables.** Join a Fusion result with a bank statement, a
-  budget or an account mapping that sits in your workbook, in plain SQL on your computer —
-  without chains of `XLOOKUP`s or Power Query.
-- **Self-contained workbooks.** Queries and their parameter bindings travel inside the `.xlsx`.
-  Send the workbook to a colleague: they sign in with their own Fusion account and refresh.
-- **Built-in guardrails.**
-  - DEV, TEST and PROD shown in colour wherever their data appears.
-  - Queries from someone else's workbook run only after you confirm them.
-  - HR tables are read through their secured views, so you see only the people your role
-    allows.
+- **Two SQL engines working together.**
+  - *From Fusion, in Oracle SQL:* AP, AR, GL, SLA, PO, FA, HR. Results are kept in an encrypted
+    local database — a million rows by default, up to 100 million for a query that only feeds
+    calculations.
+  - *Calculated on your computer, in DuckDB SQL:* `JOIN`, `GROUP BY`, window functions, `CASE`
+    over what was fetched — change the grouping or a filter without waiting on Fusion again.
+- **Your sheets are tables in SQL.** Any Excel table or range — a budget, an account mapping, a
+  bank statement — becomes a table that SQL joins with Fusion data. No chains of `XLOOKUP`s, no
+  Power Query.
+- **Parameters live on your sheet.** Point a parameter (`:period` in Oracle SQL, `$period` in
+  DuckDB SQL) to a cell. Change the cell, click **Refresh**, and the Excel table updates in place
+  — the formulas around it keep working.
+- **Keep the detail out of the sheet.** Line-item data stays in the local database; the sheet gets
+  what the report needs, as a table or with `=OF.TABLE(…)` and `=OF.CALL(…)`. Formulas read the
+  local data and never call Fusion themselves.
+- **Workbooks that travel, safely.** Queries, calculations and their cell bindings are kept in the
+  `.xlsx`. A colleague opens it, signs in with their own Fusion account and refreshes. DEV, TEST
+  and PROD are shown in colour; queries from someone else's workbook run only after you confirm
+  them; HR tables are read through their secured views.
 
-## How it works in 30 seconds
+## Example: the two SQL layers
 
-1. **Connect once** to your Fusion environment — DEV, TEST or PROD — with single sign-on in a
-   browser, or with a username and password.
-2. **Add a query.** Write Oracle SQL, pick one from your library or the examples, or calculate
-   from data already fetched:
+**1. Fetch from Fusion once — Oracle SQL.** A step `gl_actuals`, the posted journal lines of a
+period:
 
-   ```sql
-   SELECT invoice_num, invoice_date, invoice_amount
-   FROM ap_invoices_all
-   WHERE org_id = :bu
-     AND invoice_date >= :from_date
-   ```
+```sql
+SELECT cc.segment2 AS cost_center,      -- the segments depend on your chart of accounts
+       cc.segment3 AS account,
+       NVL(l.accounted_dr, 0) - NVL(l.accounted_cr, 0) AS amount
+FROM gl_je_lines l
+JOIN gl_code_combinations cc ON cc.code_combination_id = l.code_combination_id
+WHERE l.period_name = :period
+  AND l.status = 'P'
+```
 
-3. **Bind the parameters to cells** (`bu ← B1`, `from_date ← B2`) and place the result as a
-   refreshable Excel table, or read it with formulas:
+**2. Read a table of your workbook.** Select the budget table on a sheet and add it as an Excel
+source, `budget`, with columns `cost_center`, `account`, `budget_amount`.
 
-   ```
-   =OF.TABLE("ap_invoices", B1, B2)
-   =OF.CALL("open_ap_total", B1)
-   =OF.ASOF("ap_invoices", B1, B2)      when the data was last fetched
-   ```
+**3. Calculate on your computer — DuckDB SQL.** A step `variance` reads the other two by their
+names:
+
+```sql
+WITH actual AS (
+    SELECT cost_center, account, SUM(amount) AS actual
+    FROM gl_actuals
+    GROUP BY cost_center, account
+)
+SELECT a.cost_center, a.account, a.actual,
+       b.budget_amount AS budget,
+       a.actual - b.budget_amount AS variance
+FROM actual a
+LEFT JOIN budget b USING (cost_center, account)
+WHERE a.cost_center = $dept
+```
+
+Put `variance` on a sheet as a refreshable Excel table, or in a cell:
+
+```
+=OF.TABLE("variance", B1, B2)      the period in B1, the cost center in B2
+=OF.ASOF("gl_actuals", B1)         when the period was fetched
+```
+
+Change the cost center in `B2` and the formula is calculated again on your computer, from the
+journal lines already fetched — Fusion is not asked. Change the period in `B1` and **Refresh**
+fetches it.
 
 ## QExcel and the standard tools
 
 | | BI Publisher / OTBI export | Smart View | QExcel |
 |---|---|---|---|
-| Your own SQL over Fusion tables (AP, AR, SLA, PO, FA…) | Through a report built in Fusion | No: cubes and analyses | Yes, from Excel |
+| Your own SQL over Fusion tables (AP, AR, GL, SLA, PO, FA…) | Through a report built in Fusion | No: cubes and analyses | Yes, from Excel |
+| A SQL engine over data already fetched | No | No | Yes: DuckDB on your computer |
+| Fusion data joined with tables of your workbook | By hand | With Excel formulas | In SQL |
 | Parameters from Excel cells | No: entered in the browser | For cube members | Yes |
 | Result updated in your workbook | No: a new file each time | Yes | Yes |
-| Combine with tables in your workbook | By hand | With Excel formulas | SQL on your computer |
 
 ## Download and install
 
@@ -88,5 +120,6 @@ Publisher report deployed in your instance.
 
 ## Documentation
 
-The [user guide](docs/user-guide.md) covers the QExcel pane: connections, parameters, the query
-editor, calculations, Excel sources, formulas and what to do when something goes wrong.
+The [user guide](docs/user-guide.md) covers the QExcel pane: connections, parameters from cells,
+the query editor, calculations in DuckDB SQL, Excel sources, formulas, the query header and what
+to do when something goes wrong.
