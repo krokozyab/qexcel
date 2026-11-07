@@ -1,50 +1,85 @@
 # QExcel user guide
 
 QExcel brings Oracle Fusion Cloud data into Excel. You write a query once — Oracle SQL that
-runs in Fusion, or a calculation over data already fetched — and Excel keeps its result in a
-worksheet table or a formula that you refresh with one click.
+runs in Fusion, or a calculation over data already fetched — take its parameters from cells on
+your sheet, and refresh its tables and formulas with one click.
 
 This guide covers the QExcel pane in Excel. Installing QExcel is described in
 [Installing on macOS](install-macos.md) and
 [Installing on Windows](install-windows.md).
 
+- [Quick start](#quick-start)
 - [How QExcel works](#how-qexcel-works)
 - [The pane](#the-pane)
 - [Connections](#connections)
 - [The Workbook tab](#the-workbook-tab)
+- [Parameters from worksheet cells](#parameters-from-worksheet-cells)
 - [Refreshing the workbook](#refreshing-the-workbook)
 - [The Build tab](#the-build-tab)
 - [The query editor](#the-query-editor)
-- [Calculations: sources and lineage](#calculations-sources-and-lineage)
-- [Excel sources](#excel-sources)
+- [Calculations: combining data on your computer](#calculations-combining-data-on-your-computer)
+- [Excel sources: tables of the workbook in SQL](#excel-sources-tables-of-the-workbook-in-sql)
 - [Your query library and the examples](#your-query-library-and-the-examples)
 - [Formulas](#formulas)
 - [Queries from someone else's workbook](#queries-from-someone-elses-workbook)
 - [When something goes wrong](#when-something-goes-wrong)
 
+## Quick start
+
+### A colleague sent you a QExcel workbook
+
+1. Open the workbook, then the pane: **Home > Add-ins > QExcel**.
+2. If you have no connection yet, the line at the top of the Workbook tab asks for one: add it
+   (see [Connections](#connections)) and **Sign in** with your own Fusion account.
+3. **Needs attention** lists the workbook's queries to confirm. **Review** shows each query's
+   text; **Trust** lets it run.
+4. Change the report's parameters on the sheet — a period, a business unit — and click
+   **Refresh workbook**.
+
+### You are building a report
+
+1. On the **Build** tab, **+ Add > From Fusion** — or **Use a saved query** to start from one of
+   the examples (GL trial balance, AP open invoices, AR aging).
+2. Write the Oracle SQL with parameters such as `:period`: `WHERE period_name = :period`.
+3. Under **Parameters**, set `period` to **Cell** and click **Selected cell** with, say, `B1`
+   selected. **Preview** shows the first 200 rows; then **Save**.
+4. Select an empty cell and **Add to worksheet**. The new table takes `period` from `B1`: change
+   `B1`, click **Refresh**, and the table follows.
+
 ## How QExcel works
 
 QExcel has two parts:
 
-- **The QExcel service** (`ofexceld`) runs on your computer. It signs in to Fusion, runs the
-  queries, and keeps what they fetched in a local database. Nothing leaves your computer except
-  the queries sent to your own Fusion.
+- **The QExcel service** (`ofexceld`) runs in the background on your computer. It signs in to
+  Fusion, runs the queries, and keeps what they fetched in an encrypted local database
+  (DuckDB). Nothing leaves your computer except the queries sent to your own Fusion.
 - **The QExcel pane** in Excel shows what the workbook is made of and lets you refresh and
   build it.
 
-A workbook is made of **steps**:
+Because the fetched data is kept on your computer, formulas and calculations read it there:
+recalculating the workbook does not go to Fusion. Fusion is asked only when you refresh.
+
+A workbook is made of **steps**, of three kinds:
 
 | Step | What it is | Where it runs |
 |---|---|---|
-| **From Fusion** | An Oracle SQL query | In Fusion; the result is saved on your computer |
+| **From Fusion** | An Oracle SQL query | In Fusion, when you refresh; the result is kept on your computer |
 | **From this workbook** (an *Excel source*) | A table or range of the workbook, read as data | On your computer |
-| **Calculated from saved data** | DuckDB SQL over the other steps | On your computer, without Fusion |
+| **Calculated from saved data** | DuckDB SQL joining or totalling the other steps | On your computer, without Fusion |
 
-Each step can have **outputs**: worksheet tables it writes, and formulas (`OF.TABLE`,
-`OF.CALL`) that read it. A step without an output can still be a source of a calculation.
+> **For example — reconciling payments with the bank:**
+>
+> 1. **From Fusion**, `ap_payments` fetches the supplier payments.
+> 2. **From this workbook**, `bank_statement` reads the bank statement table on another sheet.
+> 3. **Calculated from saved data**, `unmatched` joins the two and writes only the
+>    differences to a worksheet table.
 
-The queries are kept **in the workbook**: whoever opens it gets the same steps and can refresh
-them with their own Fusion account.
+What a step writes or feeds is its **output**: a worksheet table, or formulas (`OF.TABLE`,
+`OF.CALL`) that read it. A step with no output of its own — `ap_payments` above — is still
+fetched when a calculation needs it.
+
+The queries and where their tables take their parameters from are kept **in the workbook**:
+whoever opens it gets the same steps and refreshes them with their own Fusion account.
 
 ## The pane
 
@@ -55,7 +90,7 @@ Open it with **Home > Add-ins > QExcel**.
 - **Workbook** — the results and refreshing them. This is where you start.
 - **Build** — the steps the workbook is made of, and the query editor.
 
-The pane remembers the tab you were on.
+The pane remembers the tab you were on in each workbook; a new workbook opens on Workbook.
 
 ## Connections
 
@@ -69,19 +104,23 @@ list when you click it, or by itself when one needs you to sign in.
 - **Environment** — DEV, TEST or PROD. It is shown in colour wherever data from it appears, so
   that PROD and TEST are never confused.
 - **Fusion address** — the address of your Fusion, `https://….oraclecloud.com`.
-- **SQL report path** — QExcel runs SQL in Fusion through a BI Publisher report that your Fusion
-  administrator sets up once (see [One report in Fusion](../README.md#one-report-in-fusion)). The form
-  starts with the usual path, `/Custom/Financials/RP_ARB.xdo`.
+- **SQL report path** — QExcel runs SQL in Fusion through a BI Publisher report deployed once in
+  your instance: the same report as [ofjdbc](https://github.com/krokozyab/ofjdbc), so if you use
+  ofjdbc, take the path from its JDBC URL. Otherwise un-archive `DM_ARB.xdm.catalog` and
+  `RP_ARB.xdo.catalog` from [ofjdbc/otbireport](https://github.com/krokozyab/ofjdbc/tree/master/otbireport)
+  into `/Shared Folders/Custom/Financials`. The form starts with that path,
+  `/Custom/Financials/RP_ARB.xdo`.
 - **Sign in with** — *Single sign-on, in a browser window*, or *Username and password*.
 
 Then:
 
 - **Test** runs a one-line query in Fusion through the connection.
 - **Sign in** opens a browser window for single sign-on; finish signing in there. For a
-  username and password, **Enter password** asks for it once and the QExcel service keeps it
-  on your computer.
+  username and password, **Enter password** asks for it once, and QExcel keeps it in your
+  computer's own password store (the macOS keychain, the Windows Credential Manager).
 - **Use in formulas** makes it the connection formulas use when their query names none.
-- **Sign out** forgets the sign-in; **Forget password** the saved password.
+- **Sign out** ends the sign-in; **Forget password** removes the saved password from your
+  computer.
 
 ## The Workbook tab
 
@@ -101,8 +140,7 @@ A card shows:
   - **Refresh from sources** — fetch again from Fusion, then calculate and write;
   - **Recalculate saved data** — calculate again from what was fetched, without Fusion;
   - **Edit query** — opens it on the Build tab, with a way back here;
-  - **Output settings** — this table's connection, and for each parameter whether it comes
-    from a cell, a fixed value or the query's default;
+  - **Output settings** — this table's connection, and where each parameter comes from;
   - **History** — the last refreshes;
   - **Remove worksheet output** — stops writing the table; the query stays.
 
@@ -120,6 +158,25 @@ Retry write, Fetch, Use selection.
 **Advanced & diagnostics**, at the bottom, has the service's maintenance and **Copy
 diagnostics**, for a support request.
 
+## Parameters from worksheet cells
+
+A query's parameters are written in its SQL — `:period` in Oracle SQL, `$period` in a
+calculation — and each worksheet table decides where its values come from:
+
+- **a cell** — `period ← B1`: change the cell, refresh, and the table follows;
+- **a fixed value** — `currency = USD`;
+- **the query's default** — when the parameter has one.
+
+In the editor, a parameter's **Value** or **Cell** is for **Preview**, and becomes the starting
+point of a table you **Add to worksheet**. After that, each table keeps its own: change them with
+**⋯ > Output settings** on its card. Saving the query never changes them.
+
+That is what lets one query feed two tables: `gl_trial_balance` once with the period from `B1`,
+and once with the prior period from `C1`, side by side.
+
+A text parameter in a cell may need the cell formatted as text: see
+[When something goes wrong](#when-something-goes-wrong).
+
 ## Refreshing the workbook
 
 **Refresh workbook** first shows its plan:
@@ -130,9 +187,9 @@ diagnostics**, for a support request.
 - which worksheet tables it will write;
 - what it will skip, and why — for example a query not confirmed yet.
 
-Start it, and each step is listed as it goes: "Refreshing the workbook: 2 of 5 steps over".
-Existing results stay until new data arrives. A step that fails does not stop the others; what
-depends on it uses the data saved before, and says so.
+While it runs, you see each step's progress ("Refreshing the workbook: 2 of 5 steps over"), and
+**Stop** ends it. Existing results stay until new data arrives. A step that fails does not stop
+the others; what depends on it uses the data saved before, and says so.
 
 **Retry failed** runs again only what failed: what succeeded is not fetched again.
 
@@ -147,8 +204,8 @@ says:
 
 - what the step is, and its environment;
 - **Uses:** and **Used by:** — the other steps, each a link to its card;
-- its outputs — worksheet tables ↗ — and the formulas that call it ("used in at least 3
-  formulas": QExcel finds the formulas that name the query directly);
+- its outputs — worksheet tables ↗ — and the formulas that call it. "Used in at least 3
+  formulas" counts the formulas that name the query as text, like `=OF.CALL("gl_balance")`;
 - **Edit** (or **Open** for a query from your library), **Read now** for an Excel source.
 
 The list also has queries from your library or the examples that the workbook needs: called
@@ -181,25 +238,32 @@ From the top:
    name: `=OF.TABLE("gl_balance")`. A name is lower-case letters, digits and `_`.
 3. **Sources** — for a calculation; see the next section.
 4. **The SQL.** Oracle SQL takes parameters as `:period`; DuckDB SQL as `$period`. Problems
-   are shown under it as you type, with their line. HR tables are read through their secured
-   views, which show only the people your Fusion role lets you see: `PER_ALL_PEOPLE_F` is sent
-   as `PER_PERSON_SECURED_LIST_V`, `PER_ALL_ASSIGNMENTS_M` as `PER_ASSIGNMENT_SECURED_LIST_V`,
-   and so on for eleven tables. A view may lack a column the table has: the one for
-   `CMP_SALARY` has no `ANNUAL_SALARY` or `CURRENCY_CODE`, for example.
-5. **Parameters.** Each has a **type**, a **default** and a **description**, which are saved
-   with the query, and a value for Preview — typed, or from a **Cell** — which is not. A
-   parameter without a default is required. A parameter the SQL uses but that is not declared
-   is listed with **Declare**; **✕** removes one.
+   are shown under it as you type, with their line.
+5. **Parameters.** Each has a **type**, a **default** and a **description**, saved with the
+   query. A parameter without a default is required. A parameter the SQL uses but that is not
+   declared is listed with **Declare**; **✕** removes one. **Value** or **Cell** is what Preview
+   uses: see [Parameters from worksheet cells](#parameters-from-worksheet-cells).
 6. **Preview** — the first 200 rows. It is not needed before saving.
-7. **Save** — into this workbook. Save changes the query, never where your worksheet tables
-   take their parameters from: that is each table's **Output settings**.
+7. **Save** — into this workbook.
 
-After saving, use the query:
+> **Two things to know about Oracle SQL in QExcel**
+>
+> - **The time of day.** Oracle `DATE` columns arrive as a date only, without the time. To keep
+>   the time, write `CAST(column AS TIMESTAMP)`. Columns such as `CREATION_DATE` and
+>   `LAST_UPDATE_DATE` are timestamps in Fusion and keep their time as they are.
+> - **HR tables.** HR tables are read through their secured views, which show only the people
+>   your Fusion role lets you see: `PER_ALL_PEOPLE_F` is sent as `PER_PERSON_SECURED_LIST_V`,
+>   `PER_ALL_ASSIGNMENTS_M` as `PER_ASSIGNMENT_SECURED_LIST_V`, and so on for eleven tables. A
+>   view may lack a column the table has: the one for `CMP_SALARY` has no `ANNUAL_SALARY` or
+>   `CURRENCY_CODE`, for example.
 
-- **Add to worksheet** — fetches every row into a new table at the selected cell;
-- **Insert a formula** — `OF.TABLE` in the selected cell for a small result, `OF.CALL` when
-  Preview showed a single value;
-- **Use as a source** — no output; calculations read it.
+After saving, choose how the workbook uses the query:
+
+| Choice | Best for | What it does |
+|---|---|---|
+| **Add to worksheet** | Registers and extracts, up to a million rows | Fetches every row into an Excel table at the selected cell. Refreshing keeps the table's style, your formatting, and your own columns to the right of the result |
+| **Insert a formula** | One number in a report (`OF.CALL`), or a small result as a spilled array (`OF.TABLE`, up to 10,000 rows) | Writes `=OF.CALL(…)` in the selected cell when Preview showed a single value, `=OF.TABLE(…)` otherwise |
+| **Use as a source** | A step that only feeds calculations | Writes nothing; calculations read it |
 
 **⋯ > Save a copy to my library** keeps a copy for other workbooks; see below.
 
@@ -207,7 +271,7 @@ What the header of a query file holds besides these fields (`@column`, `@refresh
 `@max_rows`, comments) is kept as written and named above the SQL. **Show the header in the
 SQL** shows the whole text, header included, to change it by hand.
 
-## Calculations: sources and lineage
+## Calculations: combining data on your computer
 
 A calculation reads other steps — its **sources** — as tables, by their names:
 
@@ -236,10 +300,10 @@ The **Sources** list above the SQL holds them:
 Refreshing a calculation fetches its Fusion sources and reads its Excel sources first; **Sources
 and refresh details** on its card shows the whole chain.
 
-## Excel sources
+## Excel sources: tables of the workbook in SQL
 
 An Excel source is a table or range of the workbook that calculations read as data — a budget,
-a mapping, a list of accounts.
+a mapping, a bank statement, a list of accounts.
 
 1. Select the table (or a range with a header row) on the sheet.
 2. Build > **+ Add > From this workbook**.
@@ -283,7 +347,7 @@ your library.
 
 | Formula | Returns |
 |---|---|
-| `OF.TABLE(query, args…)` | The result as an array that spills, headers in the first row. For small results: a large one belongs in a worksheet table |
+| `OF.TABLE(query, args…)` | The result as an array that spills, headers in the first row. Up to 10,000 rows: a larger result belongs in a worksheet table |
 | `OF.CALL(query, args…)` | A single value: a query whose result is one row and one column |
 | `OF.ASOF([query, args…])` | When the data was last fetched; without arguments, the oldest refresh of the workbook |
 | `OF.STATUS()` | `OK`, `NOT_SIGNED_IN`, `STALE` or `OFFLINE` |
@@ -296,13 +360,17 @@ your library.
 - A calculation (Local) runs on your computer when the formula is calculated.
 - Dates come back as numbers: **Format formula dates** on the Build tab gives their cells a date
   format.
+- A formula used the wrong way — SQL in place of a query's name, an unknown query, a wrong
+  argument — shows `#VALUE!`, and the pane lists it under **Formulas with errors** with the
+  reason.
 
 ## Queries from someone else's workbook
 
 A workbook you receive may contain queries. They do not run until you confirm them: **This
-workbook has 2 queries to confirm** shows each query's text, who saved it and when, with
-**Trust** and **Don't trust**. Each also says where it runs and what it reads. Until then its tables and formulas wait. A query you saved
-yourself, or one with the same text as in your library, is trusted already.
+workbook has 2 queries to confirm** shows each query's text, who saved it and when, where it
+runs and what it reads, with **Trust** and **Don't trust**. Until then its tables and formulas
+wait. A query you saved yourself, or one with the same text as in your library, is trusted
+already.
 
 If the workbook was made for another Fusion than your connection, its tables say so before they
 run, with both addresses.
@@ -321,6 +389,7 @@ trust it again.
 - **A text parameter got a number** — Excel turned a period name typed into a cell, like
   `Mon-YY`, into a date. The card says "period expects text, but Sheet1!B1 holds a number":
   format the cell as text.
+- **A formula shows `#VALUE!`** — the reason is under **Formulas with errors** in the pane.
 - For a support request, **Advanced & diagnostics > Copy diagnostics**: versions, files,
   connections and recent errors. It names your connections and their Fusion addresses: read it
   before you send it.
