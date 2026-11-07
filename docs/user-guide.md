@@ -70,7 +70,7 @@ list when you click it, or by itself when one needs you to sign in.
   that PROD and TEST are never confused.
 - **Fusion address** — the address of your Fusion, `https://….oraclecloud.com`.
 - **SQL report path** — QExcel runs SQL in Fusion through a BI Publisher report that your Fusion
-  administrator sets up once (see [ofquack](https://github.com/krokozyab/ofquack)). The form
+  administrator sets up once (see [One report in Fusion](../README.md#one-report-in-fusion)). The form
   starts with the usual path, `/Custom/Financials/RP_ARB.xdo`.
 - **Sign in with** — *Single sign-on, in a browser window*, or *Username and password*.
 

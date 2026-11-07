@@ -74,8 +74,17 @@ QExcel runs entirely on your computer: the add-in pane in Excel and a small loca
 server in the middle, no administrator rights. You also need Excel (Excel for Mac, or Excel from
 Microsoft 365 on Windows), and Google Chrome, Microsoft Edge or Chromium for single sign-on.
 
-> **Once in Fusion:** QExcel runs SQL through a small BI Publisher report that your Fusion
-> administrator sets up once — see [ofquack](https://github.com/krokozyab/ofquack).
+### One report in Fusion
+
+QExcel does not work against a stock Fusion instance: it runs SQL through one small BI
+Publisher report deployed in your instance.
+
+- **Already using [ofjdbc](https://github.com/krokozyab/ofjdbc)?** It is the same report. Use the
+  report path from your JDBC URL as the connection's **SQL report path**, and you are done.
+- **Otherwise, deploy it once.** Un-archive `DM_ARB.xdm.catalog` and `RP_ARB.xdo.catalog` from
+  [ofjdbc/otbireport](https://github.com/krokozyab/ofjdbc/tree/master/otbireport) into
+  `/Shared Folders/Custom/Financials`. QExcel's default path, `/Custom/Financials/RP_ARB.xdo`,
+  then works as is; another folder works too, with its path as the **SQL report path**.
 
 ## Documentation
 
