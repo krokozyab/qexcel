@@ -11,11 +11,11 @@ into Excel tables and formulas that refresh in place.
 
 QExcel runs on **macOS and Windows**.
 
-## Why finance teams and Fusion consultants use it
+## Why use it
 
 - **Report parameters live on your sheet.** Point a query parameter (`:period`, `:ledger`,
-  `:bu`) to a cell. Change `Oct-26` to `Nov-26`, click **Refresh**, and the Excel table updates
-  in place — the formulas around it keep working.
+  `:bu`) to a cell. Type the next period in that cell, click **Refresh**, and the Excel table
+  updates in place — the formulas around it keep working.
 - **Fusion only when you ask.** Formulas (`OF.TABLE`, `OF.CALL`) read data already fetched; they
   never call Fusion by themselves. Fusion is asked when you click **Refresh** or **Fetch** — so
   recalculating the workbook does not wait on the network.
