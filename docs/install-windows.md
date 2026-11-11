@@ -32,7 +32,7 @@ Nothing else: DuckDB and everything else the service needs is inside it.
 
 **Home > Add-ins**, then **QExcel**. If QExcel is not in the list, choose **More Add-ins**, open
 **My Add-ins**, and under **Developer Add-ins** select **QExcel** and choose **Add**. The pane
-opens on the right; the [user guide](https://github.com/krokozyab/qexcel/blob/main/docs/user-guide.md) takes it from there.
+opens on the right; the [user guide](user-guide.md) takes it from there.
 
 ## Update
 
@@ -50,7 +50,28 @@ the service keeps running.
 
 - **The pane says "QExcel service stopped", or does not open:** click the QExcel icon and
   choose **Start**. The pane comes back by itself within a few seconds.
-- **No icon?** **Start menu > QExcel > QExcel Service**.
+- **No icon?** **Start menu > QExcel > QExcel Service**. If that shortcut is not there either,
+  an antivirus removed the icon's program, `QExcelService.exe`, from the extracted folder, and
+  QExcel was installed without it. The service and the add-in work without the icon; start and
+  stop the service with `qexcel.cmd` (see [Start, stop and check](#start-stop-and-check)).
+
+## If an antivirus blocks QExcel
+
+QExcel is new and not signed, so antivirus programs have not seen its files before. Some
+block any program they have not seen, more so one that PowerShell starts, as the installer
+does. Trend Micro, for one, shows "Newly Encountered Program Detected" and "potential
+ransomware" for `ofexceld.exe`. That is a judgement on how new the file is: nothing was found
+in it.
+
+1. Check the download first (see [Check the download](#check-the-download)): the same SHA-256
+   as in the release means the file is the one that was published.
+2. Allow it for good, not once. **Allow Once** lets it start now, but the antivirus may block
+   it again when Windows starts the service at your next sign-in. Add
+   `%LOCALAPPDATA%\QExcel\bin` to the antivirus's exceptions: in Microsoft Defender,
+   **Windows Security > Virus & threat protection > Manage settings > Add or remove
+   exclusions**; in another antivirus, its exception list. On a work PC, IT may have to do it.
+3. If the antivirus removed a file from the extracted folder, extract the `.zip` again, then
+   double-click **Install QExcel.cmd** again.
 
 ## Uninstall
 
